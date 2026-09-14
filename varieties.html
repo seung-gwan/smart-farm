@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1f6f5b" />
+    <title>Smart Farm - Varieties</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=8" />
+  </head>
+  <body data-page="varieties">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand brand-link" href="index.html" aria-label="Smart Farm 홈">
+          <img src="assets/smart-farm-icon.svg" alt="Smart Farm icon" />
+          <div>
+            <p class="eyebrow">AI controlled greenhouse</p>
+            <h1>Smart Farm</h1>
+          </div>
+        </a>
+        <nav class="top-nav" aria-label="화면 이동">
+          <a class="button" href="index.html">작물 선택</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="library-hero">
+          <div>
+            <p class="eyebrow">품종 선택</p>
+            <h2 id="varietyHeroTitle">품종을 선택하세요</h2>
+            <p id="varietyHeroText">같은 작물이라도 품종별 생육 기준과 관리 메모를 따로 볼 수 있습니다.</p>
+          </div>
+        </section>
+
+        <section class="library-section">
+          <div class="section-heading">
+            <p class="eyebrow">Variety Library</p>
+            <h2 id="varietySectionTitle">품종 목록</h2>
+          </div>
+          <div id="varietyGrid" class="crop-card-grid"></div>
+        </section>
+
+        <section class="add-panel">
+          <div class="section-heading">
+            <p class="eyebrow">새 품종</p>
+            <h2>품종 추가</h2>
+          </div>
+          <div class="add-form variety-add-form">
+            <label>
+              <span>품종 이름</span>
+              <input id="newVarietyName" type="text" placeholder="예: 아리수" />
+            </label>
+            <label>
+              <span>온도 최소</span>
+              <input id="newTempMin" type="number" value="18" />
+            </label>
+            <label>
+              <span>온도 최대</span>
+              <input id="newTempMax" type="number" value="24" />
+            </label>
+            <label>
+              <span>습도 최소</span>
+              <input id="newHumidityMin" type="number" value="55" />
+            </label>
+            <label>
+              <span>습도 최대</span>
+              <input id="newHumidityMax" type="number" value="70" />
+            </label>
+            <button id="addVariety" class="button primary" type="button">품종 추가</button>
+          </div>
+          <p id="varietyMessage" class="form-message" aria-live="polite"></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="crop-data.js?v=8"></script>
+    <script src="crop-nav.js?v=8"></script>
+  </body>
+</html>

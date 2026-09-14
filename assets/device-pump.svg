@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Water pump">
+  <rect x="12" y="26" width="25" height="20" rx="5" fill="#eaf6ff" stroke="#356d9f" stroke-width="3"/>
+  <path d="M37 32h12c4 0 7 3 7 7v4" fill="none" stroke="#356d9f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M20 26v-7h14v7" fill="none" stroke="#356d9f" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M46 49c0 4-3 7-7 7s-7-3-7-7c0-5 7-13 7-13s7 8 7 13Z" fill="#5bb7e5"/>
+</svg>

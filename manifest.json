@@ -1,0 +1,17 @@
+{
+  "name": "Smart Farm",
+  "short_name": "Smart Farm",
+  "description": "AI controlled smart farming dashboard prototype",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f7f2",
+  "theme_color": "#1f6f5b",
+  "icons": [
+    {
+      "src": "assets/smart-farm-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

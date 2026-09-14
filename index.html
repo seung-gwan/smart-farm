@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1f6f5b" />
+    <title>Smart Farm</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=8" />
+  </head>
+  <body data-page="home">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand brand-link" href="index.html" aria-label="Smart Farm 홈">
+          <img src="assets/smart-farm-icon.svg" alt="Smart Farm icon" />
+          <div>
+            <p class="eyebrow">AI controlled greenhouse</p>
+            <h1>Smart Farm</h1>
+          </div>
+        </a>
+      </header>
+
+      <main>
+        <section class="library-hero">
+          <div>
+            <p class="eyebrow">작물 선택</p>
+            <h2>관리할 작물 종류를 선택하세요</h2>
+            <p>작물 종류를 먼저 고르고, 다음 화면에서 품종을 선택하면 해당 품종 기준으로 장치 제어 화면이 열립니다.</p>
+          </div>
+        </section>
+
+        <section class="library-section">
+          <div class="section-heading">
+            <p class="eyebrow">Crop Library</p>
+            <h2>작물 종류</h2>
+          </div>
+          <div id="cropGrid" class="crop-card-grid"></div>
+        </section>
+
+        <section class="add-panel">
+          <div class="section-heading">
+            <p class="eyebrow">새 작물</p>
+            <h2>작물 종류 추가</h2>
+          </div>
+          <div class="add-form">
+            <label>
+              <span>작물 이름</span>
+              <input id="newCropName" type="text" placeholder="예: 블루베리" />
+            </label>
+            <label>
+              <span>분류</span>
+              <input id="newCropGroup" type="text" placeholder="예: 과수류" />
+            </label>
+            <button id="addCropType" class="button primary" type="button">작물 추가</button>
+          </div>
+          <p id="homeMessage" class="form-message" aria-live="polite"></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="crop-data.js?v=8"></script>
+    <script src="crop-nav.js?v=8"></script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Air conditioner">
+  <rect x="8" y="14" width="48" height="26" rx="7" fill="#e8f1f7" stroke="#356d9f" stroke-width="3"/>
+  <path d="M17 31h30" stroke="#356d9f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M23 47v5M32 47v5M41 47v5" stroke="#8fb7d8" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="47" cy="22" r="3" fill="#1f8a62"/>
+</svg>

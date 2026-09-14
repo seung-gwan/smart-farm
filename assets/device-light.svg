@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LED light">
+  <path d="M20 9h24l-3 20H23L20 9Z" fill="#fff7d6" stroke="#d58b13" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M26 35h12l-2 10h-8l-2-10Z" fill="#f4c95d" stroke="#d58b13" stroke-width="3"/>
+  <path d="M17 53h30M23 49h18" stroke="#d58b13" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Heater">
+  <rect x="15" y="14" width="34" height="38" rx="8" fill="#fff3e6" stroke="#d58b13" stroke-width="3"/>
+  <path d="M24 27c4-5 0-8 4-13 7 6 1 11 7 17 4 4 4 11-3 14-8-4-12-10-8-18Z" fill="#f2a23a"/>
+  <path d="M21 52h22M24 57h16" stroke="#d58b13" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Humidifier">
+  <path d="M32 7s17 19 17 34c0 10-7 17-17 17s-17-7-17-17C15 26 32 7 32 7Z" fill="#eaf6ff" stroke="#356d9f" stroke-width="3"/>
+  <path d="M24 40c4 4 12 4 16 0" fill="none" stroke="#356d9f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 28h16" stroke="#8fb7d8" stroke-width="4" stroke-linecap="round"/>
+</svg>

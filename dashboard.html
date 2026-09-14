@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1f6f5b" />
+    <title>Smart Farm - Dashboard</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=8" />
+  </head>
+  <body data-page="dashboard">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand brand-link" href="index.html" aria-label="Smart Farm 홈">
+          <img src="assets/smart-farm-icon.svg" alt="Smart Farm icon" />
+          <div>
+            <p class="eyebrow">AI controlled greenhouse</p>
+            <h1>Smart Farm</h1>
+          </div>
+        </a>
+        <nav class="top-nav" aria-label="화면 이동">
+          <a class="button" href="index.html">작물 선택</a>
+          <a id="backToVarieties" class="button" href="varieties.html?crop=apple">품종 선택</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="status-band">
+          <div class="status-copy">
+            <p class="eyebrow" id="farmMode">실시간 농장 상태</p>
+            <h2 id="farmHeadline">사과 후지 생육 환경 관리 중</h2>
+            <p id="farmSummary">센서 데이터를 기준으로 온도, 습도, 토양 상태를 자동 분석합니다.</p>
+          </div>
+          <div class="farm-score">
+            <span id="healthScore">87</span>
+            <small>Health</small>
+          </div>
+        </section>
+
+        <section class="metric-grid" id="metricGrid" aria-label="현재 센서 정보"></section>
+
+        <section class="workspace">
+          <aside class="device-panel" aria-label="장치 목록">
+            <div class="section-heading">
+              <p class="eyebrow">장치 제어</p>
+              <h2>Device Control</h2>
+            </div>
+            <div id="deviceList" class="device-list"></div>
+          </aside>
+
+          <section class="detail-panel" aria-label="선택 장치 상세">
+            <div class="device-detail-head">
+              <div>
+                <p class="eyebrow">선택 장치</p>
+                <h2 id="selectedDeviceName">1번 에어컨</h2>
+              </div>
+              <button id="selectedToggle" class="switch" type="button" aria-pressed="false" aria-label="선택 장치 전원">
+                <span></span>
+              </button>
+            </div>
+
+            <div class="detail-grid">
+              <div class="readout">
+                <span>현재 온도</span>
+                <strong id="currentTemp">23.8 C</strong>
+                <small id="targetTemp">적정 18-24 C</small>
+              </div>
+              <div class="readout">
+                <span>현재 습도</span>
+                <strong id="currentHumidity">68%</strong>
+                <small id="targetHumidity">적정 55-70%</small>
+              </div>
+              <div class="readout">
+                <span>토양 수분</span>
+                <strong id="currentSoil">42%</strong>
+                <small id="targetSoil">적정 35-55%</small>
+              </div>
+              <div class="readout">
+                <span>CO2</span>
+                <strong id="currentCo2">610 ppm</strong>
+                <small id="targetCo2">적정 500-900 ppm</small>
+              </div>
+            </div>
+
+            <div class="control-stack">
+              <label>
+                <span>목표 온도</span>
+                <input id="tempSlider" type="range" min="5" max="35" step="0.5" />
+                <output id="tempOutput">22 C</output>
+              </label>
+              <label>
+                <span>목표 습도</span>
+                <input id="humiditySlider" type="range" min="30" max="95" step="1" />
+                <output id="humidityOutput">65%</output>
+              </label>
+            </div>
+
+            <div class="detail-actions">
+              <button id="runAutomation" class="button primary">자동 조절 실행</button>
+              <button id="simulateProblem" class="button">문제 상황 시뮬레이션</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="insight-layout">
+          <section class="crop-panel">
+            <div class="section-heading">
+              <p class="eyebrow">작물 정보</p>
+              <h2 id="cropTitle">사과 후지 재배 기준</h2>
+            </div>
+            <div id="cropInfo" class="crop-info"></div>
+          </section>
+
+          <section class="diagnosis-panel">
+            <div class="section-heading">
+              <p class="eyebrow">이미지 진단</p>
+              <h2>AI Crop Check</h2>
+            </div>
+            <div class="upload-zone">
+              <input id="cropPhoto" type="file" accept="image/*" />
+              <div id="photoPreview" class="photo-preview">
+                <span>작물 사진을 올리면 상태 분석 결과가 표시됩니다.</span>
+              </div>
+              <button id="analyzePhoto" class="button primary">사진 분석</button>
+            </div>
+            <div id="diagnosisResult" class="diagnosis-result">
+              <strong>대기 중</strong>
+              <p>잎, 과실, 줄기 사진을 업로드해 병해충 또는 환경 스트레스 여부를 확인하세요.</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="log-section">
+          <div class="section-heading">
+            <p class="eyebrow">자동 제어 기록</p>
+            <h2>Action Log</h2>
+          </div>
+          <ol id="actionLog"></ol>
+        </section>
+      </main>
+    </div>
+
+    <script src="crop-data.js?v=8"></script>
+    <script src="app.js?v=8"></script>
+  </body>
+</html>
