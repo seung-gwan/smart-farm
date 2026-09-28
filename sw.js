@@ -1,4 +1,4 @@
-const CACHE_NAME = "smart-farm-prototype-v9";
+const CACHE_NAME = "smart-farm-prototype-v10";
 const FILES = [
   "./",
   "index.html",

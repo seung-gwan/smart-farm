@@ -14,6 +14,31 @@ const CODEX_REASONING = process.env.SMART_FARM_CODEX_REASONING || "low";
 const MAX_BODY_BYTES = 9 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const CODEX_TIMEOUT_MS = 4 * 60 * 1000;
+const PUBLIC_FILES = new Set([
+  "index.html",
+  "varieties.html",
+  "dashboard.html",
+  "styles.css",
+  "crop-data.js",
+  "crop-nav.js",
+  "app.js",
+  "manifest.json",
+  "sw.js",
+  "crop-database.json",
+  "crop-database.csv",
+]);
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+};
 
 const ALLOWED_ORIGINS = new Set([
   "https://seung-gwan.github.io",
@@ -38,6 +63,38 @@ function corsHeaders(origin) {
 function sendJson(response, statusCode, payload, origin = "") {
   response.writeHead(statusCode, corsHeaders(origin));
   response.end(JSON.stringify(payload));
+}
+
+async function serveStatic(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") return false;
+
+  const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`);
+  let relativePath;
+  try {
+    relativePath = decodeURIComponent(requestUrl.pathname).replace(/^\/+/, "") || "index.html";
+  } catch {
+    return false;
+  }
+
+  const isPublicFile = PUBLIC_FILES.has(relativePath) || relativePath.startsWith("assets/");
+  if (!isPublicFile || relativePath.includes("..")) return false;
+
+  const filePath = path.resolve(PROJECT_DIR, relativePath.replaceAll("/", path.sep));
+  if (!filePath.startsWith(`${PROJECT_DIR}${path.sep}`)) return false;
+
+  try {
+    const file = await fsp.readFile(filePath);
+    response.writeHead(200, {
+      "Cache-Control": "no-store",
+      "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
+    });
+    response.end(request.method === "HEAD" ? undefined : file);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 function readJsonBody(request) {
@@ -246,6 +303,8 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (await serveStatic(request, response)) return;
+
   if (request.method !== "POST" || request.url !== "/diagnose") {
     sendJson(response, 404, { error: "요청한 기능을 찾을 수 없습니다." }, origin);
     return;
@@ -265,6 +324,14 @@ const server = http.createServer(async (request, response) => {
 server.listen(PORT, HOST, () => {
   console.log(`Smart Farm Codex Bridge: http://${HOST}:${PORT}`);
   console.log("Keep this window open while using AI Crop Check.");
+  if (process.env.SMART_FARM_OPEN_BROWSER === "1" && process.platform === "win32") {
+    const browser = spawn("explorer.exe", [`http://${HOST}:${PORT}/`], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false,
+    });
+    browser.unref();
+  }
 });
 
 server.on("error", (error) => {

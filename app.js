@@ -151,12 +151,27 @@ function renderDiagnosisList(title, items) {
   `;
 }
 
+function localCodexDashboardUrl() {
+  const params = new URLSearchParams({
+    crop: selectedFamily.id,
+    variety: selectedCrop.id,
+  });
+  return `${CODEX_BRIDGE_URL}/dashboard.html?${params.toString()}`;
+}
+
 function setCodexStatus(state, label) {
   elements.codexStatus.className = `connection-status ${state}`;
   elements.codexStatus.innerHTML = `<span></span>${escapeHtml(label)}`;
+  elements.codexStatus.href = localCodexDashboardUrl();
+  elements.codexStatus.title = state === "online" ? "로컬 Codex 연결 정상" : "로컬 Codex 진단 화면 열기";
 }
 
 async function checkCodexBridge() {
+  if (window.location.protocol === "https:") {
+    setCodexStatus("offline", "로컬 실행 필요");
+    return false;
+  }
+
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 1800);
   try {
@@ -800,6 +815,18 @@ async function analyzePhoto() {
     return;
   }
 
+  if (window.location.protocol === "https:") {
+    setCodexStatus("offline", "로컬 실행 필요");
+    elements.diagnosisResult.classList.add("warning");
+    elements.diagnosisResult.innerHTML = `
+      <strong>로컬 Codex 진단 화면에서 분석하세요</strong>
+      <p>브라우저 보안상 공개 HTTPS 사이트는 이 PC의 Codex 연결기에 사진을 보낼 수 없습니다.</p>
+      <a class="button primary local-diagnosis-link" href="${localCodexDashboardUrl()}">로컬 진단 화면 열기</a>
+      <small class="bridge-help">Smart Farm 폴더의 start-local-codex-bridge.cmd를 먼저 실행하세요.</small>
+    `;
+    return;
+  }
+
   elements.analyzePhoto.disabled = true;
   elements.analyzePhoto.textContent = "Codex 분석 중...";
   elements.diagnosisResult.classList.add("loading");
@@ -831,6 +858,7 @@ async function analyzePhoto() {
     elements.diagnosisResult.innerHTML = `
       <strong>Codex 연결기를 확인하세요</strong>
       <p>${escapeHtml(error.message || "로컬 Codex 연결기에 접속할 수 없습니다.")}</p>
+      <a class="button primary local-diagnosis-link" href="${localCodexDashboardUrl()}">로컬 진단 화면 열기</a>
       <small class="bridge-help">Smart Farm 폴더의 start-local-codex-bridge.cmd를 실행한 뒤 다시 분석하세요.</small>
     `;
   } finally {

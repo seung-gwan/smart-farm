@@ -607,6 +607,7 @@ output {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+  text-decoration: none;
 }
 
 .connection-status > span {
@@ -752,6 +753,10 @@ output {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.5;
+}
+
+.local-diagnosis-link {
+  margin-top: 14px;
 }
 
 .analysis-progress {

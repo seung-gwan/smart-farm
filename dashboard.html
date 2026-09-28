@@ -7,7 +7,7 @@
     <title>Smart Farm - Dashboard</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=9" />
+    <link rel="stylesheet" href="styles.css?v=10" />
   </head>
   <body data-page="dashboard">
     <div class="app-shell">
@@ -118,7 +118,7 @@
                 <p class="eyebrow">이미지 진단</p>
                 <h2>AI Crop Check</h2>
               </div>
-              <span id="codexStatus" class="connection-status checking"><span></span>연결 확인 중</span>
+              <a id="codexStatus" class="connection-status checking" href="http://127.0.0.1:8765/"><span></span>연결 확인 중</a>
             </div>
             <div class="upload-zone">
               <input id="cropPhoto" type="file" accept="image/*" />
@@ -144,7 +144,7 @@
       </main>
     </div>
 
-    <script src="crop-data.js?v=9"></script>
-    <script src="app.js?v=9"></script>
+    <script src="crop-data.js?v=10"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>

@@ -17,6 +17,7 @@ if errorlevel 1 (
 
 echo Starting Smart Farm Codex Bridge...
 echo Keep this window open while using AI Crop Check.
+set SMART_FARM_OPEN_BROWSER=1
 node local-codex-bridge.js
 
 if errorlevel 1 pause
