@@ -60,6 +60,7 @@ const devices = [
 const SENSOR_KEYS = ["temperature", "humidity", "soilMoisture", "co2", "light"];
 const AUTO_DEVICE_IDS = ["ac1", "heater1", "fan1", "pump1", "humid1", "light1", "co21"];
 const TICK_MS = 1100;
+const CODEX_BRIDGE_URL = "http://127.0.0.1:8765";
 
 let selectedDeviceId = devices[0].id;
 let autoMode = false;
@@ -70,6 +71,7 @@ let nextDriftChange = 0;
 let tickCount = 0;
 let lastAutoStates = {};
 let correctionStates = {};
+let uploadedPhotoDataUrl = "";
 
 let sensors = {
   temperature: selectedCrop.temp[0] + 1.8,
@@ -110,6 +112,7 @@ const elements = {
   photoPreview: document.querySelector("#photoPreview"),
   analyzePhoto: document.querySelector("#analyzePhoto"),
   diagnosisResult: document.querySelector("#diagnosisResult"),
+  codexStatus: document.querySelector("#codexStatus"),
   backToVarieties: document.querySelector("#backToVarieties"),
 };
 
@@ -127,6 +130,49 @@ function clamp(value, min, max) {
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderDiagnosisList(title, items) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return `
+    <section class="diagnosis-block">
+      <h3>${escapeHtml(title)}</h3>
+      <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </section>
+  `;
+}
+
+function setCodexStatus(state, label) {
+  elements.codexStatus.className = `connection-status ${state}`;
+  elements.codexStatus.innerHTML = `<span></span>${escapeHtml(label)}`;
+}
+
+async function checkCodexBridge() {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 1800);
+  try {
+    const response = await fetch(`${CODEX_BRIDGE_URL}/health`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error("Bridge unavailable");
+    setCodexStatus("online", "Codex 연결됨");
+    return true;
+  } catch {
+    setCodexStatus("offline", "로컬 연결 필요");
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 function approach(current, target, step) {
@@ -689,9 +735,60 @@ function simulateProblem() {
   renderAll();
 }
 
-function analyzePhoto() {
+function currentDiagnosisContext() {
+  return {
+    crop: selectedFamily.name,
+    variety: selectedCrop.name,
+    alias: selectedCrop.alias || "",
+    capturedAt: new Date().toISOString(),
+    sensors: {
+      temperatureC: Number(sensors.temperature.toFixed(1)),
+      humidityPercent: Math.round(sensors.humidity),
+      soilMoisturePercent: Math.round(sensors.soilMoisture),
+      co2Ppm: Math.round(sensors.co2),
+      soilPh: Number(sensors.soilPh.toFixed(1)),
+      lightHours: Number(sensors.light.toFixed(1)),
+    },
+    targets: {
+      temperatureC: selectedCrop.temp,
+      humidityPercent: selectedCrop.humidity,
+      soilMoisturePercent: selectedCrop.soilMoisture,
+      co2Ppm: selectedCrop.co2,
+      soilPh: selectedCrop.soilPh,
+      lightHours: selectedCrop.light,
+    },
+  };
+}
+
+function renderCodexDiagnosis(result) {
+  const statusClass = result.status === "healthy" ? "good" : result.status === "uncertain" ? "uncertain" : "warning";
+  const confidence = Number.isFinite(Number(result.confidencePercent)) ? Math.round(Number(result.confidencePercent)) : 0;
+  const morePhotos = result.needsMorePhotos && result.additionalPhotoGuide
+    ? `<section class="diagnosis-block more-photos"><h3>추가 확인 사진</h3><p>${escapeHtml(result.additionalPhotoGuide)}</p></section>`
+    : "";
+
+  elements.diagnosisResult.className = `diagnosis-result ${statusClass}`;
+  elements.diagnosisResult.innerHTML = `
+    <div class="diagnosis-title-row">
+      <div>
+        <small>${escapeHtml(result.affectedPart || "부위 확인 필요")}</small>
+        <strong>${escapeHtml(result.likelyDiagnosis || "판단 보류")}</strong>
+      </div>
+      <span class="confidence">가능성 ${confidence}%</span>
+    </div>
+    <p class="diagnosis-summary">${escapeHtml(result.summary || "사진만으로 상태를 판단하기 어렵습니다.")}</p>
+    ${renderDiagnosisList("사진에서 확인한 근거", result.evidence)}
+    ${renderDiagnosisList("생육 환경 분석", result.environmentAssessment)}
+    ${renderDiagnosisList("지금 해야 할 조치", result.immediateActions)}
+    ${renderDiagnosisList("재발 예방", result.prevention)}
+    ${renderDiagnosisList("다른 가능성", result.alternativeDiagnoses)}
+    ${morePhotos}
+    <p class="diagnosis-disclaimer">${escapeHtml(result.disclaimer || "사진 기반 선별 결과이므로 현장 전문가의 확인이 필요합니다.")}</p>
+  `;
+}
+
+async function analyzePhoto() {
   const hasPhoto = elements.cropPhoto.files && elements.cropPhoto.files.length > 0;
-  const score = calculateScore();
   elements.diagnosisResult.className = "diagnosis-result";
 
   if (!hasPhoto) {
@@ -703,22 +800,43 @@ function analyzePhoto() {
     return;
   }
 
-  if (score >= 82) {
-    elements.diagnosisResult.classList.add("good");
-    elements.diagnosisResult.innerHTML = `
-      <strong>${selectedFamily.name} ${selectedCrop.name} 상태 양호</strong>
-      <p>이미지 기준 큰 이상은 없는 것으로 처리했습니다. 현재 온습도 범위를 유지하세요.</p>
-    `;
-    addLog("사진 분석 완료: 작물 상태가 양호한 것으로 기록했습니다.");
-    return;
-  }
-
-  elements.diagnosisResult.classList.add("warning");
+  elements.analyzePhoto.disabled = true;
+  elements.analyzePhoto.textContent = "Codex 분석 중...";
+  elements.diagnosisResult.classList.add("loading");
   elements.diagnosisResult.innerHTML = `
-    <strong>${selectedFamily.name} ${selectedCrop.name} 환경 스트레스 의심</strong>
-    <p>센서값이 기준을 벗어나 잎 처짐, 반점, 생육 지연 가능성이 있습니다. 자동 조절을 켜고 경과를 확인하세요.</p>
+    <div class="analysis-progress"><span></span><strong>사진과 생육 환경을 함께 분석하고 있습니다</strong></div>
+    <p>작물의 병징과 현재 센서값을 비교하는 중입니다.</p>
   `;
-  addLog("사진 분석 완료: 환경 스트레스 가능성을 기록했습니다.");
+
+  try {
+    const response = await fetch(`${CODEX_BRIDGE_URL}/diagnose`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageDataUrl: uploadedPhotoDataUrl,
+        context: currentDiagnosisContext(),
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || "Codex 분석 요청에 실패했습니다.");
+    }
+
+    setCodexStatus("online", "Codex 연결됨");
+    renderCodexDiagnosis(payload.result);
+    addLog(`Codex 사진 분석 완료: ${payload.result.likelyDiagnosis || "판단 보류"}`);
+  } catch (error) {
+    setCodexStatus("offline", "로컬 연결 필요");
+    elements.diagnosisResult.className = "diagnosis-result warning";
+    elements.diagnosisResult.innerHTML = `
+      <strong>Codex 연결기를 확인하세요</strong>
+      <p>${escapeHtml(error.message || "로컬 Codex 연결기에 접속할 수 없습니다.")}</p>
+      <small class="bridge-help">Smart Farm 폴더의 start-local-codex-bridge.cmd를 실행한 뒤 다시 분석하세요.</small>
+    `;
+  } finally {
+    elements.analyzePhoto.disabled = false;
+    elements.analyzePhoto.textContent = "사진 분석";
+  }
 }
 
 elements.deviceList.addEventListener("click", (event) => {
@@ -764,10 +882,14 @@ elements.analyzePhoto.addEventListener("click", analyzePhoto);
 
 elements.cropPhoto.addEventListener("change", () => {
   const file = elements.cropPhoto.files[0];
-  if (!file) return;
+  if (!file) {
+    uploadedPhotoDataUrl = "";
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
-    elements.photoPreview.innerHTML = `<img src="${reader.result}" alt="업로드한 작물 사진 미리보기" />`;
+    uploadedPhotoDataUrl = String(reader.result);
+    elements.photoPreview.innerHTML = `<img src="${uploadedPhotoDataUrl}" alt="업로드한 작물 사진 미리보기" />`;
   };
   reader.readAsDataURL(file);
 });
@@ -786,4 +908,5 @@ if ("serviceWorker" in navigator) {
 
 syncDeviceTargetsToCrop();
 renderAll();
+checkCodexBridge();
 addLog(`Smart Farm 앱을 시작했습니다. 현재 ${selectedFamily.name} ${selectedCrop.name} 품종을 관리 중입니다.`);

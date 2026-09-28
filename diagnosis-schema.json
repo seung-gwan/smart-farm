@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "warning", "critical", "uncertain"]
+    },
+    "affectedPart": { "type": "string" },
+    "likelyDiagnosis": { "type": "string" },
+    "confidencePercent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "summary": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 5
+    },
+    "environmentAssessment": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 5
+    },
+    "immediateActions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 6
+    },
+    "prevention": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 6
+    },
+    "alternativeDiagnoses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 3
+    },
+    "needsMorePhotos": { "type": "boolean" },
+    "additionalPhotoGuide": { "type": "string" },
+    "disclaimer": { "type": "string" }
+  },
+  "required": [
+    "status",
+    "affectedPart",
+    "likelyDiagnosis",
+    "confidencePercent",
+    "summary",
+    "evidence",
+    "environmentAssessment",
+    "immediateActions",
+    "prevention",
+    "alternativeDiagnoses",
+    "needsMorePhotos",
+    "additionalPhotoGuide",
+    "disclaimer"
+  ]
+}

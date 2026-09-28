@@ -590,6 +590,44 @@ output {
   gap: 12px;
 }
 
+.diagnosis-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.connection-status > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.connection-status.online > span {
+  background: var(--green);
+}
+
+.connection-status.offline > span {
+  background: var(--warning);
+}
+
+.connection-status.checking > span {
+  animation: status-pulse 1s ease-in-out infinite;
+}
+
 .upload-zone input {
   width: 100%;
   padding: 10px;
@@ -635,6 +673,15 @@ output {
   background: #edf8f2;
 }
 
+.diagnosis-result.uncertain {
+  border-left-color: var(--blue);
+  background: #eef5fb;
+}
+
+.diagnosis-result.loading {
+  border-left-color: var(--blue);
+}
+
 .diagnosis-result strong {
   display: block;
   margin-bottom: 4px;
@@ -644,6 +691,95 @@ output {
   margin: 0;
   color: var(--muted);
   font-weight: 700;
+}
+
+.diagnosis-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diagnosis-title-row small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.confidence {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.diagnosis-summary {
+  margin-top: 10px !important;
+}
+
+.diagnosis-block {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(50, 76, 65, 0.14);
+}
+
+.diagnosis-block h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.diagnosis-block ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.diagnosis-disclaimer,
+.bridge-help {
+  display: block;
+  margin-top: 16px !important;
+  padding-top: 12px;
+  border-top: 1px solid rgba(50, 76, 65, 0.14);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.analysis-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.analysis-progress > span {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(31, 111, 91, 0.2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: analysis-spin 0.8s linear infinite;
+}
+
+@keyframes analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes status-pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .log-section ol {
