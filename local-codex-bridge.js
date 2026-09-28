@@ -84,6 +84,8 @@ const CODEX_VERSION = codexVersionCheck.stdout.trim();
 
 const ALLOWED_ORIGINS = new Set([
   "https://seung-gwan.github.io",
+  `http://${HOST}:${PORT}`,
+  `http://localhost:${PORT}`,
   "http://127.0.0.1:8050",
   "http://localhost:8050",
   "null",
