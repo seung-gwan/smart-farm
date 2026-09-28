@@ -8,16 +8,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-where codex >nul 2>nul
-if errorlevel 1 (
-  echo Codex CLI was not found.
-  pause
-  exit /b 1
-)
-
 echo Starting Smart Farm Codex Bridge...
 echo Keep this window open while using AI Crop Check.
-set SMART_FARM_OPEN_BROWSER=1
+if not defined SMART_FARM_OPEN_BROWSER set SMART_FARM_OPEN_BROWSER=1
 node local-codex-bridge.js
 
 if errorlevel 1 pause

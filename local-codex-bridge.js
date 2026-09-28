@@ -1,14 +1,14 @@
 const http = require("http");
+const fs = require("fs");
 const fsp = require("fs/promises");
 const os = require("os");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.SMART_FARM_CODEX_PORT || 8765);
 const PROJECT_DIR = __dirname;
 const SCHEMA_PATH = path.join(PROJECT_DIR, "diagnosis-schema.json");
-const CODEX_BIN = process.env.CODEX_BIN || "codex";
 const CODEX_MODEL = process.env.SMART_FARM_CODEX_MODEL || "gpt-6-luna";
 const CODEX_REASONING = process.env.SMART_FARM_CODEX_REASONING || "low";
 const MAX_BODY_BYTES = 9 * 1024 * 1024;
@@ -39,6 +39,48 @@ const MIME_TYPES = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
 };
+
+function resolveCodexBinary() {
+  if (process.env.CODEX_BIN) return process.env.CODEX_BIN;
+  if (process.platform !== "win32") return "codex";
+
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return "codex";
+
+  const codexBinDirectory = path.join(localAppData, "OpenAI", "Codex", "bin");
+  const candidates = [];
+
+  try {
+    const directCandidate = path.join(codexBinDirectory, "codex.exe");
+    if (fs.existsSync(directCandidate)) candidates.push(directCandidate);
+
+    for (const entry of fs.readdirSync(codexBinDirectory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const candidate = path.join(codexBinDirectory, entry.name, "codex.exe");
+      if (fs.existsSync(candidate)) candidates.push(candidate);
+    }
+  } catch {
+    return "codex";
+  }
+
+  return candidates
+    .map((candidate) => ({ candidate, modifiedAt: fs.statSync(candidate).mtimeMs }))
+    .sort((left, right) => right.modifiedAt - left.modifiedAt)[0]?.candidate || "codex";
+}
+
+const CODEX_BIN = resolveCodexBinary();
+const codexVersionCheck = spawnSync(CODEX_BIN, ["--version"], {
+  encoding: "utf8",
+  windowsHide: true,
+});
+
+if (codexVersionCheck.error || codexVersionCheck.status !== 0) {
+  console.error("Codex CLI를 실행할 수 없습니다. Codex 앱을 실행하고 로그인 상태를 확인하세요.");
+  console.error(codexVersionCheck.error?.message || codexVersionCheck.stderr.trim());
+  process.exit(1);
+}
+
+const CODEX_VERSION = codexVersionCheck.stdout.trim();
 
 const ALLOWED_ORIGINS = new Set([
   "https://seung-gwan.github.io",
@@ -299,7 +341,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && request.url === "/health") {
-    sendJson(response, 200, { ok: true, service: "Smart Farm Codex Bridge" }, origin);
+    sendJson(response, 200, {
+      ok: true,
+      service: "Smart Farm Codex Bridge",
+      codexVersion: CODEX_VERSION,
+    }, origin);
     return;
   }
 
@@ -323,6 +369,7 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Smart Farm Codex Bridge: http://${HOST}:${PORT}`);
+  console.log(`Codex CLI: ${CODEX_VERSION}`);
   console.log("Keep this window open while using AI Crop Check.");
   if (process.env.SMART_FARM_OPEN_BROWSER === "1" && process.platform === "win32") {
     const browser = spawn("explorer.exe", [`http://${HOST}:${PORT}/`], {
