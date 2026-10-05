@@ -22,6 +22,9 @@
 .weather-metrics span { min-width: 110px; border-left: 3px solid var(--blue); padding-left: 12px; }
 .weather-band small, #weatherSource { color: var(--muted); }
 .weather-band a { text-decoration: underline; }
+[hidden] { display: none !important; }
+#sensorUrl { width: 320px; }
+button:disabled, input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
 .window-control { display: flex; align-items: center; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
 .window-control input { width: 220px; max-width: 100%; }
 

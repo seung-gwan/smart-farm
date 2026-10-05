@@ -79,6 +79,13 @@ let windowPercent = 0;
 let ventDecision = null;
 let weatherRequest = 0;
 let weatherCoordinates = null;
+let operationMode = 'test';
+let liveEndpoint = '';
+let liveTimestamp = 0;
+let liveRequest = 0;
+let liveController = null;
+let liveError = '';
+let savedTestSensors = null;
 
 let sensors = {
   temperature: selectedCrop.temp[0] + 1.8,
@@ -523,21 +530,128 @@ function renderAll() {
   renderCropInfo();
   renderHeadline();
   renderControlButtons();
+  renderOperatingMode();
 }
 
+function liveFresh() {
+  return !liveError && liveTimestamp > 0 && Date.now() - liveTimestamp < 15000;
+}
+
+function renderOperatingMode() {
+  const live = operationMode === 'live';
+  document.querySelector('#sensorForm').hidden = !live;
+  document.querySelector('#weatherScenario').disabled = live;
+  for (const control of [elements.runAutomation, elements.simulateProblem, elements.selectedToggle, elements.tempSlider, elements.humiditySlider]) control.disabled = live;
+  document.querySelectorAll('[data-toggle-device]').forEach(button => { button.disabled = live; });
+  document.querySelector('#sensorStatus').textContent = !live ? '시험 모드 · 외기와 수동 장치 효과를 모의 계산 중' :
+    liveError || (liveFresh() ? `실제 센서 수신 · 측정 ${new Date(liveTimestamp).toLocaleTimeString('ko-KR')} · 3초마다 조회` : liveTimestamp ? '센서 수신 지연 · 마지막 측정값은 현재값으로 표시하지 않습니다.' : '실제 센서 수신 대기 · 센서 조회 URL을 연결하세요.');
+  if (!live) return;
+  const fresh = liveFresh();
+  const metrics = [ ['temperature', '온도', '°C'], ['humidity', '습도', '%'], ['soilMoisture', '토양 수분', '%'], ['co2', 'CO2', 'ppm'], ['soilPh', '토양 pH', ''], ['light', '일조 시간', 'h'] ];
+  const display = (key, unit) => fresh && Number.isFinite(sensors[key]) ? `${Number(sensors[key].toFixed(1))} ${unit}` : '수신 대기';
+  elements.metricGrid.innerHTML = metrics.map(([key, label, unit]) => metricTemplate(label, display(key, unit), fresh && Number.isFinite(sensors[key]) ? '실제 센서 측정값' : '유효한 측정값 없음', fresh && Number.isFinite(sensors[key]) ? 'ok' : 'warn')).join('');
+  elements.currentTemp.textContent = display('temperature', '°C');
+  elements.currentHumidity.textContent = display('humidity', '%');
+  elements.currentSoil.textContent = display('soilMoisture', '%');
+  elements.currentCo2.textContent = display('co2', 'ppm');
+  elements.healthScore.textContent = '--';
+  elements.farmSummary.textContent = '실제 센서 조회 전용 · 시험 장치 제어 중지';
+  elements.farmMode.textContent = '실제 센서 모드';
+  document.querySelectorAll('.device-row small').forEach(label => { label.textContent = '실제 장치 상태 미연결'; });
+  document.querySelector('#windowOutput').textContent = '상태 미수신';
+}
+
+function changeOperatingMode(mode) {
+  if (!['test', 'live'].includes(mode) || mode === operationMode) return;
+  liveRequest++;
+  liveController?.abort();
+  liveController = null;
+  if (mode === 'live') savedTestSensors = { ...sensors };
+  operationMode = mode;
+  autoMode = false;
+  simulationRunning = false;
+  correctionStates = {};
+  lastAutoStates = {};
+  driftPlan = {};
+  ventDecision = null;
+  windowPercent = 0;
+  setAutoDevicesIdle();
+  sensors = mode === 'test' ? savedTestSensors || sensors : Object.fromEntries(Object.keys(sensors).map(key => [key, NaN]));
+  liveTimestamp = 0;
+  liveError = '';
+  if (mode === 'test') ensureControlLoop();
+  else { stopControlLoopIfIdle(); if (liveEndpoint) pollLiveSensors(); }
+  renderAll();
+}
+
+async function pollLiveSensors() {
+  if (operationMode !== 'live' || !liveEndpoint || liveController) return;
+  const request = liveRequest;
+  const controller = new AbortController();
+  liveController = controller;
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(liveEndpoint, { cache: 'no-store', signal: controller.signal, credentials: 'omit' });
+    if (!response.ok) throw new Error(`센서 응답 오류 (${response.status})`);
+    const payload = await response.json();
+    if (request !== liveRequest || operationMode !== 'live') return;
+    const timestamp = typeof payload.measuredAt === 'string' ? Date.parse(payload.measuredAt) : NaN;
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp >= 15000 || timestamp > Date.now() + 2000) throw new Error('센서 측정 시각이 오래되었거나 올바르지 않습니다.');
+    const readings = payload.sensors;
+    const bounds = {temperature: [-50, 80], humidity: [0, 100], soilMoisture: [0, 100], co2: [0, 100000], soilPh: [0, 14], light: [0, 24]};
+    if (!readings || !Number.isFinite(readings.temperature) || !Number.isFinite(readings.humidity)) throw new Error('실제 온도·습도 측정값이 없습니다.');
+    const next = {};
+    for (const [key, range] of Object.entries(bounds)) {
+      const value = readings[key];
+      if (value == null && !['temperature', 'humidity'].includes(key)) { next[key] = NaN; continue; }
+      if (!Number.isFinite(value) || value < range[0] || value > range[1]) throw new Error(`센서 값 확인 필요: ${key}`);
+      next[key] = value;
+    }
+    sensors = next;
+    liveTimestamp = timestamp;
+    liveError = '';
+  } catch (error) {
+    if (request === liveRequest && operationMode === 'live') liveError = `센서 연결 오류 · ${error.message}`;
+  } finally {
+    clearTimeout(timeout);
+    if (request === liveRequest) { liveController = null; renderAll(); }
+  }
+}
+
+document.querySelector('#operationMode').addEventListener('change', event => changeOperatingMode(event.target.value));
+document.querySelector('#sensorForm').addEventListener('submit', event => {
+  event.preventDefault();
+  if (operationMode !== 'live') return;
+  const address = new URL(document.querySelector('#sensorUrl').value);
+  if (!['http:', 'https:'].includes(address.protocol) || address.username || address.password) return;
+  liveRequest++;
+  liveController?.abort();
+  liveController = null;
+  liveEndpoint = address.href;
+  liveTimestamp = 0;
+  liveError = '';
+  pollLiveSensors();
+});
+window.setInterval(pollLiveSensors, 3000);
+
 function toggleDevice(deviceId) {
+  if (operationMode !== 'test') return;
   const device = devices.find((item) => item.id === deviceId);
   if (!device) return;
+  if (autoMode) {
+    autoMode = false;
+    correctionStates = {};
+    ventDecision = null;
+    addLog('장치 수동 제어로 전환했습니다.');
+  }
   if (deviceId === 'window1' || deviceId === 'fan1') {
-    const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
-    if (decision.block && !device.on) { addLog(decision.reason); return; }
-    if (autoMode) { addLog('자동 조절 중에는 환기 장치가 외부 기후에 따라 제어됩니다.'); return; }
     if (deviceId === 'window1') windowPercent = device.on ? 0 : 50;
     if (deviceId === 'fan1' && !device.on) { windowPercent = Math.max(windowPercent, 20); setDeviceOn('window1', true); }
     if (deviceId === 'window1' && device.on) setDeviceOn('fan1', false);
   }
   selectedDeviceId = device.id;
   device.on = !device.on;
+  ensureControlLoop();
   addLog(`${device.name}을 ${device.on ? "켰습니다" : "껐습니다"}.`);
   renderAll();
 }
@@ -631,7 +745,7 @@ function correctSensorValue(key) {
 }
 
 function applyAutomaticControl() {
-  if (!autoMode) return;
+  if (operationMode !== 'test' || !autoMode) return;
   easeDeviceTargets();
   let activeCorrection = false;
 
@@ -676,7 +790,7 @@ function applyAutomaticControl() {
 
 function enforceVentSafety() {
   const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
-  if (decision.block) {
+  if (decision.block && autoMode && operationMode === 'test') {
     windowPercent = 0;
     setDeviceOn('window1', false);
     setDeviceOn('fan1', false);
@@ -685,6 +799,7 @@ function enforceVentSafety() {
 }
 
 function applyClimateControl() {
+  if (operationMode !== 'test') return false;
   let decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
   for (const key of ['temperature', 'humidity', 'co2']) {
     if (decision.demand[key]) correctionStates[key] = decision.demand[key];
@@ -739,11 +854,11 @@ function renderWeather() {
   document.querySelector('#weatherMetrics').innerHTML = [
     ['외부 온도', `${outdoor.temperature.toFixed(1)} °C`], ['외부 습도', `${outdoor.humidity}%`],
     ['풍속 / 돌풍', `${outdoor.wind} / ${outdoor.gust} m/s`], ['강수', `${outdoor.rain} mm`],
-    ['실내 온도 환산 습도', `${Math.round(decision.equivalentHumidity)}%`],
+    ['실내 온도 환산 습도', Number.isFinite(decision.equivalentHumidity) ? `${Math.round(decision.equivalentHumidity)}%` : '수신 대기'],
   ].map(([label, value]) => `<span>${label}<br><strong>${value}</strong></span>`).join('');
-  document.querySelector('#ventilationStatus').textContent = `${autoMode ? decision.reason : '수동 제어 · ' + (decision.block || '자동 조절 대기')} · 창문 ${windowPercent}% · 배기팬 ${devices.find(d => d.id === 'fan1').on ? '켜짐' : '꺼짐'}${decision.demand.co2 === 'high' && !decision.opening ? ' · CO2 배출 불가: 현장 확인 필요' : ''}`;
+  document.querySelector('#ventilationStatus').textContent = operationMode === 'live' ? '실제 센서 조회 전용 · 장치 명령 전송 안 함' : `${autoMode ? decision.reason : '수동 시험 · ' + (decision.block ? decision.block + ' (수동 시험 허용)' : '외기·장치 영향 반영 중')} · 창문 ${windowPercent}% · 배기팬 ${devices.find(d => d.id === 'fan1').on ? '켜짐' : '꺼짐'}${decision.demand.co2 === 'high' && !decision.opening ? ' · CO2 배출 불가: 현장 확인 필요' : ''}`;
   document.querySelector('#windowOpening').value = windowPercent;
-  document.querySelector('#windowOpening').disabled = autoMode || Boolean(decision.block);
+  document.querySelector('#windowOpening').disabled = operationMode !== 'test';
   document.querySelector('#windowOutput').textContent = `${windowPercent}%`;
 }
 
@@ -786,6 +901,7 @@ document.querySelector('#weatherLocate').addEventListener('click', () => {
   }, () => addLog('위치를 확인할 수 없습니다. 농장 좌표를 입력하세요.'), { timeout: 10000 });
 });
 document.querySelector('#weatherScenario').addEventListener('change', event => {
+  if (operationMode !== 'test') return;
   weatherRequest++;
   weatherCoordinates = null;
   try { localStorage.removeItem('smart-farm-weather-location'); } catch {}
@@ -798,7 +914,10 @@ document.querySelector('#weatherScenario').addEventListener('change', event => {
   renderAll();
 });
 document.querySelector('#windowOpening').addEventListener('input', event => {
-  if (autoMode || enforceVentSafety().block) return;
+  if (operationMode !== 'test') return;
+  autoMode = false;
+  correctionStates = {};
+  ventDecision = null;
   windowPercent = Number(event.target.value);
   setDeviceOn('window1', windowPercent > 0);
   if (!windowPercent) setDeviceOn('fan1', false);
@@ -816,7 +935,10 @@ window.setInterval(() => { if (weatherCoordinates) refreshWeather(...weatherCoor
 window.setInterval(() => { ventDecision = null; enforceVentSafety(); renderAll(); }, 5000);
 
 function controlTick() {
+  if (operationMode !== 'test') return;
   tickCount += 1;
+  if (outdoor.demo) outdoor.time = Date.now();
+  sensors = SmartSimulation.step(sensors, outdoor, autoMode ? [] : devices, autoMode ? 0 : windowPercent, !autoMode);
   applySimulationDrift();
   applyAutomaticControl();
   if (!autoMode) enforceVentSafety();
@@ -830,13 +952,14 @@ function ensureControlLoop() {
 }
 
 function stopControlLoopIfIdle() {
-  if (!simulationRunning && !autoMode && controlTimer) {
+  if (operationMode !== 'test' && controlTimer) {
     window.clearInterval(controlTimer);
     controlTimer = null;
   }
 }
 
 function runAutomation() {
+  if (operationMode !== 'test') return;
   autoMode = !autoMode;
   if (autoMode) {
     addLog("자동 조절을 시작했습니다. 기준을 벗어난 항목은 연결 장치가 자동으로 보정합니다.");
@@ -854,6 +977,7 @@ function runAutomation() {
 }
 
 function simulateProblem() {
+  if (operationMode !== 'test') return;
   simulationRunning = !simulationRunning;
   if (simulationRunning) {
     chooseDriftPlan();
@@ -920,6 +1044,11 @@ function renderCodexDiagnosis(result) {
 }
 
 async function analyzePhoto() {
+  if (operationMode === 'live' && !liveFresh()) {
+    elements.diagnosisResult.className = 'diagnosis-result warning';
+    elements.diagnosisResult.textContent = '실제 센서 수신 후 사진을 분석하세요. 현재 유효한 생육 환경 데이터가 없습니다.';
+    return;
+  }
   const hasPhoto = elements.cropPhoto.files && elements.cropPhoto.files.length > 0;
   elements.diagnosisResult.className = "diagnosis-result";
 
@@ -1010,12 +1139,14 @@ elements.deviceList.addEventListener("keydown", (event) => {
 elements.selectedToggle.addEventListener("click", () => toggleDevice(selectedDeviceId));
 
 elements.tempSlider.addEventListener("input", (event) => {
+  if (operationMode !== 'test') return;
   const device = devices.find((item) => item.id === selectedDeviceId);
   device.targetTemp = Number(event.target.value);
   elements.tempOutput.value = `${device.targetTemp} C`;
 });
 
 elements.humiditySlider.addEventListener("input", (event) => {
+  if (operationMode !== 'test') return;
   const device = devices.find((item) => item.id === selectedDeviceId);
   device.targetHumidity = Number(event.target.value);
   elements.humidityOutput.value = `${device.targetHumidity}%`;
@@ -1052,6 +1183,7 @@ if ("serviceWorker" in navigator) {
 }
 
 syncDeviceTargetsToCrop();
+ensureControlLoop();
 renderAll();
 checkCodexBridge();
 addLog(`Smart Farm 앱을 시작했습니다. 현재 ${selectedFamily.name} ${selectedCrop.name} 품종을 관리 중입니다.`);

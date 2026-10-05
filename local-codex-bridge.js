@@ -23,6 +23,7 @@ const PUBLIC_FILES = new Set([
   "crop-nav.js",
   "app.js",
   "ventilation.js",
+  "simulation.js",
   "manifest.json",
   "sw.js",
   "crop-database.json",
@@ -189,6 +190,7 @@ function text(value, fallback = "확인되지 않음") {
 }
 
 function finiteNumber(value) {
+  if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }

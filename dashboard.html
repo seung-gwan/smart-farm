@@ -7,7 +7,7 @@
     <title>Smart Farm - Dashboard</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=11" />
+    <link rel="stylesheet" href="styles.css?v=12" />
   </head>
   <body data-page="dashboard">
     <div class="app-shell">
@@ -38,6 +38,16 @@
           </div>
         </section>
 
+        <section class="weather-band" aria-label="운영 모드">
+          <div class="weather-controls">
+            <label>운영 모드<select id="operationMode"><option value="test">시험 모드</option><option value="live">실제 센서 모드</option></select></label>
+            <form id="sensorForm" class="weather-controls" hidden>
+              <label>센서 조회 URL<input id="sensorUrl" type="url" placeholder="https://sensor.example/readings" required /></label>
+              <button type="submit" class="button">센서 연결</button>
+            </form>
+          </div>
+          <p id="sensorStatus" role="status">시험 모드 · 날씨와 장치에 따라 모의 센서값이 변합니다.</p>
+        </section>
         <section class="metric-grid" id="metricGrid" aria-label="현재 센서 정보"></section>
 
         <section class="weather-band" aria-label="외부 기후와 환기">
@@ -159,6 +169,7 @@
 
     <script src="crop-data.js?v=10"></script>
     <script src="ventilation.js?v=11"></script>
-    <script src="app.js?v=11"></script>
+    <script src="simulation.js?v=12"></script>
+    <script src="app.js?v=12"></script>
   </body>
 </html>

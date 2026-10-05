@@ -54,7 +54,8 @@ const os = require('node:os');
     await page.route('https://api.open-meteo.com/**', route => route.abort());
     await page.getByRole('button', {name: '기상 갱신'}).click();
     await page.waitForFunction(() => outdoor.time === 0);
-    assert.equal(await page.locator('#windowOpening').isDisabled(), true);
+    assert.equal(await page.locator('#windowOpening').isDisabled(), false);
+    assert.equal(await page.evaluate(() => windowPercent), 0);
     for (const width of [1440, 390]) {
       await page.setViewportSize({width, height: 1000});
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow ${width}`);
