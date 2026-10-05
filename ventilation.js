@@ -1,14 +1,21 @@
 // Simulation controller. Weather estimates are not on-site safety sensors.
 (function (root) {
   const saturation = (t) => 6.112 * Math.exp(17.67 * t / (t + 243.5));
-  function decide(inside, outside, ranges, previous = {}, now = Date.now()) {
+  function decide(inside, outside, ranges, previous = {}, now = Date.now(), targets = {}) {
     const goals = { temperature: (ranges.temp[0] + ranges.temp[1]) / 2,
       humidity: Math.round((ranges.humidity[0] + ranges.humidity[1]) / 2),
       co2: Math.round((ranges.co2[0] + ranges.co2[1]) / 2) };
     const limits = { temperature: ranges.temp, humidity: ranges.humidity, co2: ranges.co2 };
+    for (const key of ['temperature', 'humidity']) {
+      if (!Number.isFinite(targets[key])) continue;
+      goals[key] = targets[key];
+      const margin = key === 'temperature' ? 1 : 3;
+      limits[key] = [goals[key] - margin, goals[key] + margin];
+    }
     const demand = {};
     for (const key of Object.keys(goals)) {
       const old = previous[key];
+      if (inside[key] === goals[key]) continue;
       if (old === 'high' && inside[key] > goals[key]) demand[key] = old;
       else if (old === 'low' && inside[key] < goals[key]) demand[key] = old;
       else if (inside[key] >= limits[key][1]) demand[key] = 'high';

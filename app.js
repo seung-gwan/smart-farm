@@ -74,6 +74,7 @@ let tickCount = 0;
 let lastAutoStates = {};
 let correctionStates = {};
 let uploadedPhotoDataUrl = "";
+const customTargets = {};
 let outdoor = { temperature: 18, humidity: 50, wind: 2, gust: 3, rain: 0, time: Date.now(), source: '시험 날씨: 서늘·건조', demo: true };
 let windowPercent = 0;
 let ventDecision = null;
@@ -291,6 +292,7 @@ function setAutoDevicesIdle() {
 }
 
 function targetForSensor(key) {
+  if (Number.isFinite(customTargets[key])) return customTargets[key];
   const target = midpoint(getSensorConfig(key).range);
   return key === "temperature" ? target : Math.round(target);
 }
@@ -316,12 +318,33 @@ function hasActiveCorrections() {
 }
 
 function easeDeviceTargets() {
-  const targetTemp = midpoint(selectedCrop.temp);
-  const targetHumidity = Math.round(midpoint(selectedCrop.humidity));
+  const targetTemp = targetForSensor('temperature');
+  const targetHumidity = targetForSensor('humidity');
   devices.forEach((device) => {
-    device.targetTemp = Math.round(approach(device.targetTemp, targetTemp, 0.4) * 10) / 10;
-    device.targetHumidity = Math.round(approach(device.targetHumidity, targetHumidity, 1));
+    device.targetTemp = targetTemp;
+    device.targetHumidity = targetHumidity;
   });
+}
+
+function climateDecision() {
+  return SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates, Date.now(), customTargets);
+}
+
+function activateCustomTargets() {
+  for (const [key, target] of Object.entries(customTargets)) {
+    delete correctionStates[key];
+    if (sensors[key] > target) correctionStates[key] = 'high';
+    if (sensors[key] < target) correctionStates[key] = 'low';
+  }
+}
+
+function setCustomTarget(key, value) {
+  if (operationMode !== 'test' || !Number.isFinite(value)) return;
+  customTargets[key] = value;
+  easeDeviceTargets();
+  if (autoMode) activateCustomTargets();
+  ventDecision = null;
+  renderAll();
 }
 
 function syncDeviceTargetsToCrop() {
@@ -506,7 +529,7 @@ function renderHeadline() {
   } else if (simulationRunning) {
     elements.farmSummary.textContent = "문제 상황 시뮬레이션이 실행 중입니다. 온도, 습도, 토양 수분, CO2 중 일부 값이 서서히 변합니다.";
   } else if (autoMode) {
-    elements.farmSummary.textContent = "자동 제어가 절전 감시 중입니다. 허용 범위 안에서는 장치를 꺼두고, 범위를 벗어나면 목표값까지 보정합니다.";
+    elements.farmSummary.textContent = `자동 목표: ${targetForSensor('temperature')} C · ${targetForSensor('humidity')}%. ${Object.keys(customTargets).length ? '사용자 설정 우선 · 설정한 항목은 목표 도달 후 온도 ±1 C, 습도 ±3%p에서 재가동합니다.' : '허용 범위를 벗어나면 목표값까지 보정합니다.'}`;
   } else if (score >= 85) {
     elements.farmSummary.textContent = "현재 주요 센서 값이 적정 범위에 가깝습니다. 자동 제어는 대기 상태입니다.";
   } else if (score >= 70) {
@@ -541,6 +564,7 @@ function renderOperatingMode() {
   const live = operationMode === 'live';
   document.querySelector('#sensorForm').hidden = !live;
   document.querySelector('#weatherScenario').disabled = live;
+  document.querySelector('#resetTargets').disabled = live;
   for (const control of [elements.runAutomation, elements.simulateProblem, elements.selectedToggle, elements.tempSlider, elements.humiditySlider]) control.disabled = live;
   document.querySelectorAll('[data-toggle-device]').forEach(button => { button.disabled = live; });
   document.querySelector('#sensorStatus').textContent = !live ? '시험 모드 · 외기와 수동 장치 효과를 모의 계산 중' :
@@ -789,7 +813,7 @@ function applyAutomaticControl() {
 }
 
 function enforceVentSafety() {
-  const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  const decision = climateDecision();
   if (decision.block && autoMode && operationMode === 'test') {
     windowPercent = 0;
     setDeviceOn('window1', false);
@@ -800,7 +824,7 @@ function enforceVentSafety() {
 
 function applyClimateControl() {
   if (operationMode !== 'test') return false;
-  let decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  let decision = climateDecision();
   for (const key of ['temperature', 'humidity', 'co2']) {
     if (decision.demand[key]) correctionStates[key] = decision.demand[key];
     else delete correctionStates[key];
@@ -830,7 +854,7 @@ function applyClimateControl() {
     }
     if (Math.abs(sensors[key] - decision.goals[key]) < (key === 'temperature' ? 0.05 : 0.5)) sensors[key] = decision.goals[key];
   }
-  decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  decision = climateDecision();
   for (const key of ['temperature', 'humidity', 'co2']) {
     if (decision.demand[key]) correctionStates[key] = decision.demand[key];
     else delete correctionStates[key];
@@ -849,7 +873,7 @@ function applyClimateControl() {
 }
 
 function renderWeather() {
-  const decision = ventDecision || SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  const decision = ventDecision || climateDecision();
   document.querySelector('#weatherSource').textContent = `${outdoor.source} · ${outdoor.time ? new Date(outdoor.time).toLocaleTimeString('ko-KR') : '시간 확인 불가'} · ${outdoor.demo ? '예시값' : '기상 모델 추정값'}`;
   document.querySelector('#weatherMetrics').innerHTML = [
     ['외부 온도', `${outdoor.temperature.toFixed(1)} °C`], ['외부 습도', `${outdoor.humidity}%`],
@@ -963,6 +987,7 @@ function runAutomation() {
   autoMode = !autoMode;
   if (autoMode) {
     addLog("자동 조절을 시작했습니다. 기준을 벗어난 항목은 연결 장치가 자동으로 보정합니다.");
+    activateCustomTargets();
     applyAutomaticControl();
     ensureControlLoop();
   } else {
@@ -1139,17 +1164,22 @@ elements.deviceList.addEventListener("keydown", (event) => {
 elements.selectedToggle.addEventListener("click", () => toggleDevice(selectedDeviceId));
 
 elements.tempSlider.addEventListener("input", (event) => {
-  if (operationMode !== 'test') return;
-  const device = devices.find((item) => item.id === selectedDeviceId);
-  device.targetTemp = Number(event.target.value);
-  elements.tempOutput.value = `${device.targetTemp} C`;
+  setCustomTarget('temperature', Number(event.target.value));
 });
 
 elements.humiditySlider.addEventListener("input", (event) => {
+  setCustomTarget('humidity', Number(event.target.value));
+});
+
+document.querySelector('#resetTargets').addEventListener('click', () => {
   if (operationMode !== 'test') return;
-  const device = devices.find((item) => item.id === selectedDeviceId);
-  device.targetHumidity = Number(event.target.value);
-  elements.humidityOutput.value = `${device.targetHumidity}%`;
+  delete customTargets.temperature;
+  delete customTargets.humidity;
+  delete correctionStates.temperature;
+  delete correctionStates.humidity;
+  easeDeviceTargets();
+  ventDecision = null;
+  renderAll();
 });
 
 elements.runAutomation.addEventListener("click", runAutomation);
