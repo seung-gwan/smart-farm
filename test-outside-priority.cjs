@@ -21,13 +21,14 @@ const {chromium} = require('playwright');
         applyClimateControl();
         if (switchedAt === null && devices.find(d => d.id === device).on) switchedAt = sensors.temperature;
       }
-      return {first, switchedAt, final: sensors.temperature, electric: devices.find(d => d.id === device).on};
+      return {first, switchedAt, final: sensors.temperature, electric: devices.find(d => d.id === device).on, opening: windowPercent};
     }
     const cooling = scenario(30,26,22,'ac1');
     const warming = scenario(16,19,21,'heater1');
     const full = scenario(30,18,22,'ac1');
+    const cold = scenario(20,-9,9,'ac1');
     outdoor.rain = 1; sensors.temperature = 30; activateCustomTargets(); applyClimateControl();
-    return {cooling,warming,full, rain: windowPercent === 0 && devices.find(d => d.id === 'ac1').on};
+    return {cooling,warming,full,cold, rain: windowPercent === 0 && devices.find(d => d.id === 'ac1').on};
   });
   for (const entry of [results.cooling, results.warming, results.full]) {
     assert.deepEqual(entry.first, {open:true,electric:false}); assert.equal(entry.electric,false);
@@ -38,6 +39,11 @@ const {chromium} = require('playwright');
   assert.ok(results.warming.switchedAt >=18.7 && results.warming.switchedAt <=19);
   assert.equal(results.full.switchedAt,null);
   assert.equal(results.full.final,22);
+  assert.deepEqual(results.cold.first,{open:true,electric:false});
+  assert.equal(results.cold.switchedAt,null);
+  assert.equal(results.cold.final,9);
+  assert.equal(results.cold.electric,false);
+  assert.equal(results.cold.opening,0);
   assert.equal(results.rain,true);
   console.log(JSON.stringify(results));
  } finally {await browser.close();}

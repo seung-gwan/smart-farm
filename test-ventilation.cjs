@@ -7,7 +7,7 @@ assert.equal(decide(inside, weather, ranges).fan, true);
 assert.equal(decide(inside, {...weather, wind: 2}, ranges).fan, false);
 assert.equal(decide({...inside, temperature: 22}, weather, ranges, {temperature: 'high'}).opening, 60);
 assert.equal(decide({...inside, temperature: 21}, weather, ranges, {temperature: 'high'}).opening, 0);
-for (const bad of [{rain: 1}, {wind: 8}, {gust: 12}, {temperature: -5}, {time: 0}]) {
+for (const bad of [{rain: 1}, {wind: 8}, {gust: 12}, {time: 0}]) {
   assert.equal(decide(inside, {...weather, ...bad}, ranges).opening, 0);
 }
 assert.equal(decide(inside, {...weather, temperature: 35, humidity: 90}, ranges).opening, 0);
@@ -15,3 +15,7 @@ assert.equal(decide({...inside, temperature: 17}, weather, ranges).warming, true
 assert.equal(decide({...inside, temperature: 22, humidity: 85}, weather, ranges).drying, true);
 assert.equal(decide({...inside, temperature: 22, humidity: 85}, {...weather, temperature: 22, humidity: 95}, ranges).drying, false);
 console.log('Ventilation decision scenarios passed');
+const cold = {...weather, temperature: -9};
+assert.equal(decide({temperature:20, humidity:65, co2:700}, cold, ranges, {}, Date.now(), {temperature:9}).opening, 10);
+assert.equal(decide({temperature:9.5, humidity:65, co2:700}, cold, ranges, {temperature:'high'}, Date.now(), {temperature:9}).opening, 5);
+assert.equal(decide({temperature:9, humidity:65, co2:700}, cold, ranges, {temperature:'high'}, Date.now(), {temperature:9}).opening, 0);

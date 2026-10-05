@@ -25,14 +25,16 @@
     const stale = !valid || now - outside.time > 30 * 60 * 1000 || outside.time > now + 60000;
     let block = stale ? '외부 기상 정보 없음 또는 30분 경과' :
       outside.rain > 0 ? '강수 감지' : outside.wind >= 8 || outside.gust >= 12 ? '강풍·돌풍 감지' :
-      outside.temperature < ranges.temp[0] - 5 ? '외기 저온' : '';
+      outside.temperature < ranges.temp[0] - 5 && !(demand.temperature === 'high' && outside.temperature < inside.temperature - 0.3) ? '외기 저온 · 냉각 필요 없음' : '';
     const equivalentHumidity = valid ? outside.humidity * saturation(outside.temperature) / saturation(inside.temperature) : NaN;
     const cooling = demand.temperature === 'high' && outside.temperature < inside.temperature - 0.3 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
     const warming = demand.temperature === 'low' && outside.temperature > inside.temperature + 0.3 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
     const drying = demand.humidity === 'high' && equivalentHumidity < inside.humidity - 3 && outside.temperature >= ranges.temp[0] && outside.temperature <= ranges.temp[1];
     const purge = demand.co2 === 'high' && outside.temperature >= ranges.temp[0] && outside.temperature <= ranges.temp[1] && equivalentHumidity >= ranges.humidity[0] && equivalentHumidity <= ranges.humidity[1];
     const ventilate = !block && (cooling || warming || (demand.temperature !== 'low' && (drying || purge)));
-    const opening = ventilate ? (outside.wind >= 4 ? 20 : 60) : 0;
+    const largeTemperatureGap = Math.abs(inside.temperature - outside.temperature) >= 10;
+    const nearTarget = Math.abs(inside.temperature - goals.temperature) < 1;
+    const opening = ventilate ? (cooling || warming) && largeTemperatureGap ? (nearTarget ? 5 : 10) : (outside.wind >= 4 ? 20 : 60) : 0;
     return { goals, demand, opening, fan: ventilate && outside.wind < 1.5,
       cooling: ventilate && cooling, warming: ventilate && warming, drying: ventilate && drying, purge: ventilate && purge,
       equivalentHumidity, block,
