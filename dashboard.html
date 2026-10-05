@@ -7,7 +7,7 @@
     <title>Smart Farm - Dashboard</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/smart-farm-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=10" />
+    <link rel="stylesheet" href="styles.css?v=11" />
   </head>
   <body data-page="dashboard">
     <div class="app-shell">
@@ -40,6 +40,19 @@
 
         <section class="metric-grid" id="metricGrid" aria-label="현재 센서 정보"></section>
 
+        <section class="weather-band" aria-label="외부 기후와 환기">
+          <div class="section-heading"><p class="eyebrow">외부 기후 · 모의 장치 제어</p><h2>온실 환기</h2></div>
+          <form id="weatherForm" class="weather-controls">
+            <label>위도<input id="weatherLat" type="number" min="-90" max="90" step="any" required placeholder="35.87" /></label>
+            <label>경도<input id="weatherLon" type="number" min="-180" max="180" step="any" required placeholder="128.60" /></label>
+            <button class="button" type="submit">기상 갱신</button><button class="button" id="weatherLocate" type="button">현재 위치</button>
+            <label>시험 날씨<select id="weatherScenario"><option value="mild">서늘·건조</option><option value="hot">고온·다습</option><option value="rain">비</option><option value="wind">강풍</option><option value="cold">한파</option></select></label>
+          </form>
+          <p id="weatherSource"></p><div id="weatherMetrics" class="weather-metrics"></div>
+          <p id="ventilationStatus" role="status"></p>
+          <label class="window-control">창문 개방률 <input id="windowOpening" type="range" min="0" max="100" step="5" value="0" /><output id="windowOutput">0%</output></label>
+          <small>실내 센서·장치 동작은 시뮬레이션입니다. 강풍 차단 8 m/s · 돌풍 12 m/s는 시험 설정값입니다. 실설비 기준은 창문 제조사와 현장 센서에 맞춰야 합니다. 기상 자료: <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a></small>
+        </section>
         <section class="workspace">
           <aside class="device-panel" aria-label="장치 목록">
             <div class="section-heading">
@@ -145,6 +158,7 @@
     </div>
 
     <script src="crop-data.js?v=10"></script>
-    <script src="app.js?v=10"></script>
+    <script src="ventilation.js?v=11"></script>
+    <script src="app.js?v=11"></script>
   </body>
 </html>

@@ -48,6 +48,8 @@ function getSelection() {
 const { family: selectedFamily, variety: selectedCrop } = getSelection();
 
 const devices = [
+  { id: "window1", name: "온실 자동 창문", type: "개폐", icon: "assets/device-window.svg", on: false, targetTemp: 22, targetHumidity: 65 },
+  { id: "dry1", name: "제습기", type: "제습", icon: "assets/device-humidity.svg", on: false, targetTemp: 22, targetHumidity: 65 },
   { id: "ac1", name: "1번 에어컨", type: "냉방", icon: "assets/device-ac.svg", on: false, targetTemp: 22, targetHumidity: 65 },
   { id: "heater1", name: "2번 히터", type: "난방", icon: "assets/device-heater.svg", on: false, targetTemp: 22, targetHumidity: 65 },
   { id: "fan1", name: "3번 환풍기", type: "환기", icon: "assets/device-fan.svg", on: false, targetTemp: 22, targetHumidity: 65 },
@@ -58,7 +60,7 @@ const devices = [
 ];
 
 const SENSOR_KEYS = ["temperature", "humidity", "soilMoisture", "co2", "light"];
-const AUTO_DEVICE_IDS = ["ac1", "heater1", "fan1", "pump1", "humid1", "light1", "co21"];
+const AUTO_DEVICE_IDS = devices.map(device => device.id);
 const TICK_MS = 1100;
 const CODEX_BRIDGE_URL = "http://127.0.0.1:8765";
 
@@ -72,6 +74,11 @@ let tickCount = 0;
 let lastAutoStates = {};
 let correctionStates = {};
 let uploadedPhotoDataUrl = "";
+let outdoor = { temperature: 18, humidity: 50, wind: 2, gust: 3, rain: 0, time: Date.now(), source: '시험 날씨: 서늘·건조', demo: true };
+let windowPercent = 0;
+let ventDecision = null;
+let weatherRequest = 0;
+let weatherCoordinates = null;
 
 let sensors = {
   temperature: selectedCrop.temp[0] + 1.8,
@@ -509,6 +516,7 @@ function renderControlButtons() {
 }
 
 function renderAll() {
+  renderWeather();
   renderMetrics();
   renderDevices();
   renderDeviceDetail();
@@ -520,6 +528,14 @@ function renderAll() {
 function toggleDevice(deviceId) {
   const device = devices.find((item) => item.id === deviceId);
   if (!device) return;
+  if (deviceId === 'window1' || deviceId === 'fan1') {
+    const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+    if (decision.block && !device.on) { addLog(decision.reason); return; }
+    if (autoMode) { addLog('자동 조절 중에는 환기 장치가 외부 기후에 따라 제어됩니다.'); return; }
+    if (deviceId === 'window1') windowPercent = device.on ? 0 : 50;
+    if (deviceId === 'fan1' && !device.on) { windowPercent = Math.max(windowPercent, 20); setDeviceOn('window1', true); }
+    if (deviceId === 'window1' && device.on) setDeviceOn('fan1', false);
+  }
   selectedDeviceId = device.id;
   device.on = !device.on;
   addLog(`${device.name}을 ${device.on ? "켰습니다" : "껐습니다"}.`);
@@ -566,6 +582,8 @@ function updateAutoState(key, state, message) {
 }
 
 function correctSensorValue(key) {
+  // Climate sensors are corrected together by applyClimateControl, including outside-air effects.
+  if (['temperature', 'humidity', 'co2'].includes(key)) return 'idle';
   const config = getSensorConfig(key);
   const value = sensors[key];
   const target = targetForSensor(key);
@@ -617,38 +635,6 @@ function applyAutomaticControl() {
   easeDeviceTargets();
   let activeCorrection = false;
 
-  const tempState = correctSensorValue("temperature");
-  if (tempState === "high") {
-    activeCorrection = true;
-    setDeviceOn("ac1", true);
-    setDeviceOn("heater1", false);
-    setDeviceOn("fan1", true);
-    updateAutoState("temperature", "high", "온도가 목표값보다 높아 에어컨과 환풍기를 켜고 목표 온도로 낮추는 중입니다.");
-  } else if (tempState === "low") {
-    activeCorrection = true;
-    setDeviceOn("heater1", true);
-    setDeviceOn("ac1", false);
-    updateAutoState("temperature", "low", "온도가 목표값보다 낮아 히터를 켜고 목표 온도로 올리는 중입니다.");
-  } else {
-    setDeviceOn("ac1", false);
-    setDeviceOn("heater1", false);
-    updateAutoState("temperature", tempState, tempState === "target" ? "온도가 목표값에 도달해 냉난방 장치를 대기 상태로 전환했습니다." : "");
-  }
-
-  const humidityState = correctSensorValue("humidity");
-  if (humidityState === "high") {
-    activeCorrection = true;
-    setDeviceOn("fan1", true);
-    setDeviceOn("humid1", false);
-    updateAutoState("humidity", "high", "습도가 목표값보다 높아 환풍기를 켜고 습도를 낮추는 중입니다.");
-  } else if (humidityState === "low") {
-    activeCorrection = true;
-    setDeviceOn("humid1", true);
-    updateAutoState("humidity", "low", "습도가 목표값보다 낮아 가습기를 켜고 습도를 올리는 중입니다.");
-  } else {
-    setDeviceOn("humid1", false);
-    updateAutoState("humidity", humidityState, humidityState === "target" ? "습도가 목표값에 도달해 습도 장치를 대기 상태로 전환했습니다." : "");
-  }
 
   const soilState = correctSensorValue("soilMoisture");
   if (soilState === "low") {
@@ -664,20 +650,6 @@ function applyAutomaticControl() {
     updateAutoState("soilMoisture", soilState, soilState === "target" ? "토양 수분이 목표값에 도달해 관수 펌프를 대기 상태로 전환했습니다." : "");
   }
 
-  const co2State = correctSensorValue("co2");
-  if (co2State === "low") {
-    activeCorrection = true;
-    setDeviceOn("co21", true);
-    updateAutoState("co2", "low", "CO2가 목표값보다 낮아 CO2 공급기를 켜고 농도를 올리는 중입니다.");
-  } else if (co2State === "high") {
-    activeCorrection = true;
-    setDeviceOn("co21", false);
-    setDeviceOn("fan1", true);
-    updateAutoState("co2", "high", "CO2가 목표값보다 높아 공급기를 끄고 환풍기로 농도를 낮추는 중입니다.");
-  } else {
-    setDeviceOn("co21", false);
-    updateAutoState("co2", co2State, co2State === "target" ? "CO2가 목표값에 도달해 가스 장치를 대기 상태로 전환했습니다." : "");
-  }
 
   const lightState = correctSensorValue("light");
   if (lightState === "low") {
@@ -693,6 +665,7 @@ function applyAutomaticControl() {
     updateAutoState("light", lightState, lightState === "target" ? "광량이 목표값에 도달해 LED 조명을 대기 상태로 전환했습니다." : "");
   }
 
+  activeCorrection = applyClimateControl() || activeCorrection;
   if (!activeCorrection && allCoreSensorsInRange()) {
     setAutoDevicesIdle();
     updateAutoState("power", "idle", lastAutoStates.power !== "idle" ? "Device Control을 절전 감시 상태로 전환했습니다. 값이 허용 범위를 벗어나면 다시 필요한 장치만 켜집니다." : "");
@@ -701,10 +674,152 @@ function applyAutomaticControl() {
   }
 }
 
+function enforceVentSafety() {
+  const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  if (decision.block) {
+    windowPercent = 0;
+    setDeviceOn('window1', false);
+    setDeviceOn('fan1', false);
+  }
+  return decision;
+}
+
+function applyClimateControl() {
+  let decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  for (const key of ['temperature', 'humidity', 'co2']) {
+    if (decision.demand[key]) correctionStates[key] = decision.demand[key];
+    else delete correctionStates[key];
+  }
+  windowPercent = decision.block ? 0 : approach(windowPercent, decision.opening, 10);
+  if (!decision.opening) windowPercent = 0;
+  const exchange = windowPercent / 100 * (decision.fan ? 0.06 : 0.035);
+  if (exchange) {
+    const previousTemp = sensors.temperature;
+    const vapour = sensors.humidity * SmartVentilation.saturation(previousTemp);
+    sensors.temperature += (outdoor.temperature - sensors.temperature) * exchange;
+    sensors.humidity = clamp((vapour + (outdoor.humidity * SmartVentilation.saturation(outdoor.temperature) - vapour) * exchange) / SmartVentilation.saturation(sensors.temperature), 0, 100);
+    sensors.co2 += (420 - sensors.co2) * exchange; // Ambient CO2 is a simulation assumption.
+    for (const key of ['temperature', 'humidity', 'co2']) {
+      const direction = decision.demand[key];
+      if (direction === 'high' && sensors[key] < decision.goals[key] || direction === 'low' && sensors[key] > decision.goals[key]) sensors[key] = decision.goals[key];
+    }
+  }
+  for (const key of ['temperature', 'humidity', 'co2']) {
+    const direction = decision.demand[key];
+    if (!direction) continue;
+    const handled = key === 'temperature' && decision.cooling && outdoor.temperature < decision.goals.temperature - 0.5 ||
+      key === 'humidity' && decision.drying && decision.equivalentHumidity < decision.goals.humidity - 1 ||
+      key === 'co2' && (decision.purge || decision.opening) && direction === 'high';
+    if (!handled && !(key === 'co2' && direction === 'low' && decision.opening) && !(key === 'co2' && direction === 'high')) {
+      sensors[key] = approach(sensors[key], decision.goals[key], getSensorConfig(key).correctionStep);
+    }
+    if (Math.abs(sensors[key] - decision.goals[key]) < (key === 'temperature' ? 0.05 : 0.5)) sensors[key] = decision.goals[key];
+  }
+  decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  for (const key of ['temperature', 'humidity', 'co2']) {
+    if (decision.demand[key]) correctionStates[key] = decision.demand[key];
+    else delete correctionStates[key];
+  }
+  if (!decision.opening) windowPercent = 0;
+  setDeviceOn('window1', windowPercent > 0);
+  setDeviceOn('fan1', windowPercent > 0 && decision.fan);
+  setDeviceOn('ac1', decision.demand.temperature === 'high' && !(decision.cooling && outdoor.temperature < decision.goals.temperature - 0.5));
+  setDeviceOn('heater1', decision.demand.temperature === 'low');
+  setDeviceOn('dry1', decision.demand.humidity === 'high' && !(decision.drying && decision.equivalentHumidity < decision.goals.humidity - 1));
+  setDeviceOn('humid1', decision.demand.humidity === 'low');
+  setDeviceOn('co21', decision.demand.co2 === 'low' && !windowPercent);
+  ventDecision = decision;
+  updateAutoState('ventilation', decision.reason, decision.reason);
+  return Object.keys(decision.demand).length > 0;
+}
+
+function renderWeather() {
+  const decision = ventDecision || SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates);
+  document.querySelector('#weatherSource').textContent = `${outdoor.source} · ${outdoor.time ? new Date(outdoor.time).toLocaleTimeString('ko-KR') : '시간 확인 불가'} · ${outdoor.demo ? '예시값' : '기상 모델 추정값'}`;
+  document.querySelector('#weatherMetrics').innerHTML = [
+    ['외부 온도', `${outdoor.temperature.toFixed(1)} °C`], ['외부 습도', `${outdoor.humidity}%`],
+    ['풍속 / 돌풍', `${outdoor.wind} / ${outdoor.gust} m/s`], ['강수', `${outdoor.rain} mm`],
+    ['실내 온도 환산 습도', `${Math.round(decision.equivalentHumidity)}%`],
+  ].map(([label, value]) => `<span>${label}<br><strong>${value}</strong></span>`).join('');
+  document.querySelector('#ventilationStatus').textContent = `${autoMode ? decision.reason : '수동 제어 · ' + (decision.block || '자동 조절 대기')} · 창문 ${windowPercent}% · 배기팬 ${devices.find(d => d.id === 'fan1').on ? '켜짐' : '꺼짐'}${decision.demand.co2 === 'high' && !decision.opening ? ' · CO2 배출 불가: 현장 확인 필요' : ''}`;
+  document.querySelector('#windowOpening').value = windowPercent;
+  document.querySelector('#windowOpening').disabled = autoMode || Boolean(decision.block);
+  document.querySelector('#windowOutput').textContent = `${windowPercent}%`;
+}
+
+async function refreshWeather(latitude, longitude) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return;
+  const request = ++weatherRequest;
+  document.querySelector('#weatherSource').textContent = '기상 정보 불러오는 중...';
+  try {
+    const params = new URLSearchParams({ latitude, longitude, current: 'temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_gusts_10m', wind_speed_unit: 'ms', timeformat: 'unixtime' });
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error('기상 서버 응답 오류');
+    const { current } = await response.json();
+    if (request !== weatherRequest) return;
+    if (!current || !['temperature_2m', 'relative_humidity_2m', 'precipitation', 'wind_speed_10m', 'wind_gusts_10m', 'time'].every(k => Number.isFinite(current[k]))) throw new Error('기상 데이터 누락');
+    outdoor = { temperature: current.temperature_2m, humidity: current.relative_humidity_2m, wind: current.wind_speed_10m, gust: current.wind_gusts_10m, rain: current.precipitation, time: current.time * 1000, demo: false, source: `Open-Meteo · ${latitude.toFixed(3)}, ${longitude.toFixed(3)}` };
+    weatherCoordinates = [latitude, longitude];
+    try { localStorage.setItem('smart-farm-weather-location', JSON.stringify(weatherCoordinates)); } catch {}
+    document.querySelector('#weatherScenario').selectedIndex = -1;
+  } catch (error) {
+    if (request !== weatherRequest) return;
+    outdoor.time = 0;
+    outdoor.source = `기상 연결 실패: ${error.message}`;
+    addLog('기상 정보 확인 실패. 창문과 배기팬을 닫습니다.');
+  }
+  ventDecision = null;
+  enforceVentSafety();
+  renderAll();
+}
+
+document.querySelector('#weatherForm').addEventListener('submit', event => {
+  event.preventDefault();
+  refreshWeather(Number(document.querySelector('#weatherLat').value), Number(document.querySelector('#weatherLon').value));
+});
+document.querySelector('#weatherLocate').addEventListener('click', () => {
+  if (!navigator.geolocation) { addLog('위치 기능을 사용할 수 없습니다. 농장 좌표를 입력하세요.'); return; }
+  navigator.geolocation.getCurrentPosition(position => {
+    document.querySelector('#weatherLat').value = position.coords.latitude;
+    document.querySelector('#weatherLon').value = position.coords.longitude;
+    refreshWeather(position.coords.latitude, position.coords.longitude);
+  }, () => addLog('위치를 확인할 수 없습니다. 농장 좌표를 입력하세요.'), { timeout: 10000 });
+});
+document.querySelector('#weatherScenario').addEventListener('change', event => {
+  weatherRequest++;
+  weatherCoordinates = null;
+  try { localStorage.removeItem('smart-farm-weather-location'); } catch {}
+  const cases = { mild: [18, 50, 0.5, 1, 0], hot: [35, 85, 2, 3, 0], rain: [20, 90, 2, 4, 2], wind: [18, 50, 9, 14, 0], cold: [-5, 70, 2, 4, 0] };
+  const [temperature, humidity, wind, gust, rain] = cases[event.target.value];
+  outdoor = { temperature, humidity, wind, gust, rain, time: Date.now(), demo: true, source: `시험 날씨: ${event.target.selectedOptions[0].text}` };
+  ventDecision = null;
+  enforceVentSafety();
+  if (autoMode) applyAutomaticControl();
+  renderAll();
+});
+document.querySelector('#windowOpening').addEventListener('input', event => {
+  if (autoMode || enforceVentSafety().block) return;
+  windowPercent = Number(event.target.value);
+  setDeviceOn('window1', windowPercent > 0);
+  if (!windowPercent) setDeviceOn('fan1', false);
+  renderAll();
+});
+try {
+  const saved = JSON.parse(localStorage.getItem('smart-farm-weather-location'));
+  if (Array.isArray(saved) && saved.length === 2) {
+    document.querySelector('#weatherLat').value = saved[0];
+    document.querySelector('#weatherLon').value = saved[1];
+    refreshWeather(...saved);
+  }
+} catch {}
+window.setInterval(() => { if (weatherCoordinates) refreshWeather(...weatherCoordinates); }, 10 * 60 * 1000);
+window.setInterval(() => { ventDecision = null; enforceVentSafety(); renderAll(); }, 5000);
+
 function controlTick() {
   tickCount += 1;
   applySimulationDrift();
   applyAutomaticControl();
+  if (!autoMode) enforceVentSafety();
   renderAll();
 }
 
@@ -728,7 +843,9 @@ function runAutomation() {
     applyAutomaticControl();
     ensureControlLoop();
   } else {
-    addLog("자동 조절을 중지했습니다. 장치는 현재 상태를 유지합니다.");
+    setAutoDevicesIdle();
+    windowPercent = 0;
+    addLog("자동 조절을 중지했습니다. 창문과 자동 장치를 껐습니다.");
     lastAutoStates = {};
     correctionStates = {};
     stopControlLoopIfIdle();

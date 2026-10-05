@@ -15,6 +15,16 @@
   --shadow: 0 18px 48px rgba(25, 45, 34, 0.1);
 }
 
+.weather-band { padding: 24px 0; border-block: 1px solid var(--line); margin: 24px 0; }
+.weather-controls, .weather-metrics { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
+.weather-controls label { display: grid; gap: 4px; font-size: 14px; }
+.weather-controls input, .weather-controls select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 4px; max-width: 100%; width: 150px; }
+.weather-metrics span { min-width: 110px; border-left: 3px solid var(--blue); padding-left: 12px; }
+.weather-band small, #weatherSource { color: var(--muted); }
+.weather-band a { text-decoration: underline; }
+.window-control { display: flex; align-items: center; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+.window-control input { width: 220px; max-width: 100%; }
+
 * {
   box-sizing: border-box;
 }

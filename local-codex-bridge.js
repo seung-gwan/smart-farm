@@ -22,6 +22,7 @@ const PUBLIC_FILES = new Set([
   "crop-data.js",
   "crop-nav.js",
   "app.js",
+  "ventilation.js",
   "manifest.json",
   "sw.js",
   "crop-database.json",
