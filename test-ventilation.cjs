@@ -11,7 +11,7 @@ for (const bad of [{rain: 1}, {wind: 8}, {gust: 12}, {time: 0}]) {
   assert.equal(decide(inside, {...weather, ...bad}, ranges).opening, 0);
 }
 assert.equal(decide(inside, {...weather, temperature: 35, humidity: 90}, ranges).opening, 0);
-assert.equal(decide({...inside, temperature: 17}, weather, ranges).warming, true);
+assert.equal(decide({...inside, temperature: 16}, weather, ranges).warming, true);
 assert.equal(decide({...inside, temperature: 22, humidity: 85}, weather, ranges).drying, true);
 assert.equal(decide({...inside, temperature: 22, humidity: 85}, {...weather, temperature: 22, humidity: 95}, ranges).drying, false);
 console.log('Ventilation decision scenarios passed');

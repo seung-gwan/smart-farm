@@ -75,6 +75,7 @@ let lastAutoStates = {};
 let correctionStates = {};
 let uploadedPhotoDataUrl = "";
 const customTargets = {};
+let ventilationProgress = {};
 let outdoor = { temperature: 18, humidity: 50, wind: 2, gust: 3, rain: 0, time: Date.now(), source: '시험 날씨: 서늘·건조', demo: true };
 let windowPercent = 0;
 let ventDecision = null;
@@ -327,10 +328,35 @@ function easeDeviceTargets() {
 }
 
 function climateDecision() {
-  return SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates, Date.now(), customTargets);
+  const decision = SmartVentilation.decide(sensors, outdoor, selectedCrop, correctionStates, Date.now(), customTargets);
+  const direction = decision.demand.temperature;
+  const key = `${decision.goals.temperature}:${direction}`;
+  const ineffective = direction && !decision.cooling && !decision.warming;
+  if (ineffective || direction && ventilationProgress.key === key && ventilationProgress.locked) {
+    return {...decision, opening: 0, fan: false, cooling: false, warming: false, drying: false, purge: false,
+      reason: `${decision.block || '외기 냉난방 효과 부족'} · 창문 닫힘 · ${direction === 'high' ? '에어컨' : '히터'}로 목표 보정`};
+  }
+  return decision;
+}
+
+function trackVentilationProgress() {
+  const decision = climateDecision();
+  const direction = decision.demand.temperature;
+  if (!direction) { ventilationProgress = {}; return; }
+  const key = `${decision.goals.temperature}:${direction}`;
+  if (ventilationProgress.key !== key) ventilationProgress = {key, anchor: sensors.temperature, samples: 0, locked: false};
+  if (!decision.cooling && !decision.warming) { ventilationProgress.locked = true; return; }
+  if (windowPercent <= 0) return;
+  if (++ventilationProgress.samples >= 10) {
+    const progress = (sensors.temperature - ventilationProgress.anchor) * (direction === 'high' ? -1 : 1);
+    if (progress < 0.2) ventilationProgress.locked = true;
+    ventilationProgress.anchor = sensors.temperature;
+    ventilationProgress.samples = 0;
+  }
 }
 
 function activateCustomTargets() {
+  ventilationProgress = {};
   for (const [key, target] of Object.entries(customTargets)) {
     delete correctionStates[key];
     if (sensors[key] > target) correctionStates[key] = 'high';
@@ -824,6 +850,7 @@ function enforceVentSafety() {
 
 function applyClimateControl() {
   if (operationMode !== 'test') return false;
+  trackVentilationProgress();
   let decision = climateDecision();
   for (const key of ['temperature', 'humidity', 'co2']) {
     if (decision.demand[key]) correctionStates[key] = decision.demand[key];
@@ -926,6 +953,7 @@ document.querySelector('#weatherLocate').addEventListener('click', () => {
 });
 document.querySelector('#weatherScenario').addEventListener('change', event => {
   if (operationMode !== 'test') return;
+  ventilationProgress = {};
   weatherRequest++;
   weatherCoordinates = null;
   try { localStorage.removeItem('smart-farm-weather-location'); } catch {}

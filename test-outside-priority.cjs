@@ -27,16 +27,24 @@ const {chromium} = require('playwright');
     const warming = scenario(16,19,21,'heater1');
     const full = scenario(30,18,22,'ac1');
     const cold = scenario(20,-9,9,'ac1');
+    const closeOutside = scenario(18.6,18,9,'ac1');
+    setAutoDevicesIdle(); correctionStates = {}; windowPercent = 0;
+    sensors.temperature = 30; outdoor.temperature = 18; outdoor.rain = 0;
+    customTargets.temperature = 9; activateCustomTargets();
+    for (let i=0;i<12;i++) { sensors.temperature = 30; applyClimateControl(); }
+    const stalled = windowPercent === 0 && devices.find(d => d.id === 'ac1').on;
+    sensors.temperature = 29; applyClimateControl();
+    const staysClosed = windowPercent === 0;
     outdoor.rain = 1; sensors.temperature = 30; activateCustomTargets(); applyClimateControl();
-    return {cooling,warming,full,cold, rain: windowPercent === 0 && devices.find(d => d.id === 'ac1').on};
+    return {cooling,warming,full,cold,closeOutside,stalled,staysClosed, rain: windowPercent === 0 && devices.find(d => d.id === 'ac1').on};
   });
   for (const entry of [results.cooling, results.warming, results.full]) {
     assert.deepEqual(entry.first, {open:true,electric:false}); assert.equal(entry.electric,false);
   }
   assert.equal(results.cooling.final,22);
-  assert.ok(results.cooling.switchedAt <=26.3 && results.cooling.switchedAt >=26);
+  assert.ok(results.cooling.switchedAt <=27 && results.cooling.switchedAt >=26);
   assert.equal(results.warming.final,21);
-  assert.ok(results.warming.switchedAt >=18.7 && results.warming.switchedAt <=19);
+  assert.ok(results.warming.switchedAt >=18 && results.warming.switchedAt <=19);
   assert.equal(results.full.switchedAt,null);
   assert.equal(results.full.final,22);
   assert.deepEqual(results.cold.first,{open:true,electric:false});
@@ -45,6 +53,11 @@ const {chromium} = require('playwright');
   assert.equal(results.cold.electric,false);
   assert.equal(results.cold.opening,0);
   assert.equal(results.rain,true);
+  assert.deepEqual(results.closeOutside.first,{open:false,electric:true});
+  assert.equal(results.closeOutside.final,9);
+  assert.equal(results.closeOutside.opening,0);
+  assert.equal(results.stalled,true);
+  assert.equal(results.staysClosed,true);
   console.log(JSON.stringify(results));
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

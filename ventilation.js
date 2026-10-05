@@ -27,8 +27,8 @@
       outside.rain > 0 ? '강수 감지' : outside.wind >= 8 || outside.gust >= 12 ? '강풍·돌풍 감지' :
       outside.temperature < ranges.temp[0] - 5 && !(demand.temperature === 'high' && outside.temperature < inside.temperature - 0.3) ? '외기 저온 · 냉각 필요 없음' : '';
     const equivalentHumidity = valid ? outside.humidity * saturation(outside.temperature) / saturation(inside.temperature) : NaN;
-    const cooling = demand.temperature === 'high' && outside.temperature < inside.temperature - 0.3 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
-    const warming = demand.temperature === 'low' && outside.temperature > inside.temperature + 0.3 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
+    const cooling = demand.temperature === 'high' && outside.temperature < inside.temperature - 1 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
+    const warming = demand.temperature === 'low' && outside.temperature > inside.temperature + 1 && equivalentHumidity <= Math.max(ranges.humidity[1], goals.humidity + 3);
     const drying = demand.humidity === 'high' && equivalentHumidity < inside.humidity - 3 && outside.temperature >= ranges.temp[0] && outside.temperature <= ranges.temp[1];
     const purge = demand.co2 === 'high' && outside.temperature >= ranges.temp[0] && outside.temperature <= ranges.temp[1] && equivalentHumidity >= ranges.humidity[0] && equivalentHumidity <= ranges.humidity[1];
     const ventilate = !block && (cooling || warming || (demand.temperature !== 'low' && (drying || purge)));
