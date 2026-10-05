@@ -846,8 +846,8 @@ function applyClimateControl() {
   for (const key of ['temperature', 'humidity', 'co2']) {
     const direction = decision.demand[key];
     if (!direction) continue;
-    const handled = key === 'temperature' && decision.cooling && outdoor.temperature < decision.goals.temperature - 0.5 ||
-      key === 'humidity' && decision.drying && decision.equivalentHumidity < decision.goals.humidity - 1 ||
+    const handled = key === 'temperature' && (decision.cooling || decision.warming) ||
+      key === 'humidity' && decision.drying ||
       key === 'co2' && (decision.purge || decision.opening) && direction === 'high';
     if (!handled && !(key === 'co2' && direction === 'low' && decision.opening) && !(key === 'co2' && direction === 'high')) {
       sensors[key] = approach(sensors[key], decision.goals[key], getSensorConfig(key).correctionStep);
@@ -862,9 +862,9 @@ function applyClimateControl() {
   if (!decision.opening) windowPercent = 0;
   setDeviceOn('window1', windowPercent > 0);
   setDeviceOn('fan1', windowPercent > 0 && decision.fan);
-  setDeviceOn('ac1', decision.demand.temperature === 'high' && !(decision.cooling && outdoor.temperature < decision.goals.temperature - 0.5));
-  setDeviceOn('heater1', decision.demand.temperature === 'low');
-  setDeviceOn('dry1', decision.demand.humidity === 'high' && !(decision.drying && decision.equivalentHumidity < decision.goals.humidity - 1));
+  setDeviceOn('ac1', decision.demand.temperature === 'high' && !decision.cooling);
+  setDeviceOn('heater1', decision.demand.temperature === 'low' && !decision.warming);
+  setDeviceOn('dry1', decision.demand.humidity === 'high' && !decision.drying);
   setDeviceOn('humid1', decision.demand.humidity === 'low');
   setDeviceOn('co21', decision.demand.co2 === 'low' && !windowPercent);
   ventDecision = decision;
